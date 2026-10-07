@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Banana Clicker</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#ff8135;--panel:#1b1b2f;--card:#2a2a45;--text:#fff;--dim:#a9a9c8;--good:#7bd96b;--bad:#ff6b6b}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Courier New",monospace;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;user-select:none;-webkit-user-select:none}
+#top{width:100%;text-align:center;padding:14px 8px 0}
+#score{font-size:42px;font-weight:bold;text-shadow:3px 3px 0 #0006}
+#cps{font-size:16px;text-shadow:2px 2px 0 #0006}
+#stage{position:relative;flex:1;min-height:120px;width:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation}
+#banana{width:min(90vw,calc((100dvh - 300px) * 1.3),560px);height:auto;aspect-ratio:13/10;image-rendering:pixelated;will-change:transform}
+.pop{position:absolute;font-size:24px;font-weight:bold;pointer-events:none;text-shadow:2px 2px 0 #0008;animation:rise .8s ease-out forwards}
+@keyframes rise{to{transform:translateY(-80px);opacity:0}}
+.bit{position:absolute;width:8px;height:8px;pointer-events:none}
+#shop{width:100%;max-width:520px;background:#000;padding:10px 12px;margin-top:auto;font-size:16px}
+.row{flex-wrap:wrap;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.row+.row{margin-top:8px}
+.arrow{background:none;border:0;color:#fff;font:inherit;font-size:24px;cursor:pointer;padding:0 8px}
+#iname{color:#fff609;flex:1;font-weight:bold}
+#buy{background:none;border:0;font:inherit;font-weight:bold;cursor:pointer;padding:0}
+#top{position:relative}
+#upbtn{position:absolute;right:10px;top:12px;background:#000;color:#fff609;border:2px solid #fff609;border-radius:8px;font:inherit;font-weight:bold;padding:6px 10px;cursor:pointer}
+#ups{display:none;position:fixed;left:50%;transform:translateX(-50%);width:min(100%,520px);top:calc(env(safe-area-inset-top,0px) + 64px);bottom:140px;background:#000e;border-radius:12px;padding:10px;overflow-y:auto;z-index:5}
+#ups.open{display:block}
+#uphead{display:flex;justify-content:space-between;align-items:center;font-weight:bold;color:#fff609;margin-bottom:8px}
+#upall{background:#7bd96b;color:#000;border:0;border-radius:6px;font:inherit;font-weight:bold;padding:4px 10px;cursor:pointer;margin-left:auto;margin-right:10px}
+#upx{background:none;border:0;color:#fff;font:inherit;font-size:20px;cursor:pointer}
+#uplist{display:grid;gap:8px}
+.up{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--card);border:2px solid transparent;border-radius:10px;padding:8px 12px;color:#fff;font:inherit;text-align:left;cursor:pointer;opacity:.55}
+.up small{display:block;color:var(--dim)}
+.up.ok{opacity:1;border-color:#7bd96b}
+.up .cost{text-align:right;font-weight:bold;color:#ff4b4b}
+.up.ok .cost{color:#7bd96b}
+#upempty{display:none;color:var(--dim);text-align:center;padding:12px}
+.mini{background:none;border:2px solid #7bd96b;border-radius:6px;color:#7bd96b;font:inherit;font-weight:bold;padding:3px 10px;cursor:pointer;flex:1}
+.good{color:#7bd96b}.bad{color:#ff4b4b}
+#foot{font-size:12px;color:var(--dim);padding:6px 0 2px;text-align:center}
+#foot button{background:none;border:1px solid var(--dim);color:var(--dim);border-radius:6px;font:inherit;cursor:pointer;margin-left:6px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#c2561a}}
+:root[data-theme="dark"]{--bg:#c2561a}
+</style>
+</head>
+<body>
+<div id="top"><button id="upbtn">Upgrades</button><div id="score">0</div><div id="cps">0 /s</div></div>
+<div id="stage"><canvas id="banana" width="13" height="10"></canvas></div>
+<div id="ups"><div id="uphead"><span id="uptitle">Upgrades</span><button id="upall">Buy all</button><button id="upx">&times;</button></div><div id="uplist"></div><div id="upempty">Nothing to buy right now. Buy more items to unlock upgrades!</div></div>
+<div id="shop"><div class="row"><button class="arrow" id="prev">&lt;</button><span id="iname"></span><span id="iown"></span><button class="arrow" id="next">&gt;</button></div><div class="row"><button id="buy"></button><span id="ieff"></span><span id="icount"></span></div><div class="row"><button class="mini" id="buymax">Buy max (M)</button><button class="mini" id="buyall">Buy all items (V)</button></div></div>
+<div id="foot" style="background:var(--panel);width:100%;max-width:520px">Click / Space = banana &middot; &larr; &rarr; browse &middot; B / Enter = buy &middot; M = max &middot; V = all &middot; U = upgrades &middot; autosaves <button id="reset">reset save</button></div>
+<script>
+// ---------- sprite (your banana, 13x10 blocks) ----------
+var ART=["............e","...........5e","..........55e",".........555.","........5555.","......555555.",".....555555..","..5555555....","e5555555.....","..55555......"];
+var COL={"5":"#fff609","e":"#8e5c34"};
+var cv=document.getElementById("banana"),cx=cv.getContext("2d");
+ART.forEach(function(r,y){for(var x=0;x<r.length;x++){if(COL[r[x]]){cx.fillStyle=COL[r[x]];cx.fillRect(x,y,1,1)}}});
+
+// ---------- shop data ----------
+var ITEMS=[
+["Better Peel",10,0,1],["Auto-Clicker",25,1,0],["Monkey",100,3,0],["Banana Tree",300,8,0],
+["Banana Farm",800,20,0],["Smoothie Bar",2000,50,0],["Bread Shop",5000,120,0],["Factory",12000,300,0],
+["Banana Ship",30000,800,0],["Banana Planet",80000,2000,0],["Time Machine",200000,5000,0],["Portal",600000,15000,0],
+["Moon Colony",1500000,40000,0],
+["Space Station",4000000,110000,0],
+["Banana Galaxy",10000000,300000,0],
+["Black Hole",25000000,800000,0],
+["Star Forge",60000000,2200000,0],
+["Alien Trade",150000000,6000000,0],
+["Dimension Rift",400000000,16000000,0],
+["Cosmic Peel",1000000000,45000000,0],
+["Banana Multiverse",2500000000,120000000,0],
+["Quantum Grove",6000000000,330000000,0],
+["Chrono Farm",15000000000,900000000,0],
+["Singularity",40000000000,2500000000,0],
+["Banana Deity",100000000000,7000000000,0],
+["Reality Press",250000000000,19000000000,0],
+["Infinity Orchard",600000000000,50000000000,0],
+["Nebula Mill",1500000000000,140000000000,0],
+["Void Bank",4000000000000,380000000000,0],
+["Eternal Bunch",10000000000000,1000000000000,0],
+["Omega Peel",25000000000000,2800000000000,0],
+["The Last Banana",60000000000000,7500000000000,0],
+["Golden Banana",150000000000000,19000000000000,0],
+["Infinite Loop (OP)",500000000000000,200000000000000,0],
+["God Hand (OP+)",3000000000000000,5000000000000000,0],
+["Big Bang (OP++)",20000000000000000,1000000000000000000,0]
+]; // name, base cost, per second, per click
+var UPS=[
+["Sharper Fingers","2x click power",100,"click",0,2],
+["Auto Oil","Auto-Clickers 2x",250,"item",1,2],
+["Happy Monkeys","Monkeys 2x",500,"item",2,2],
+["Fertilizer","Banana Trees 2x",1500,"item",3,2],
+["Golden Gloves","2x click power",2500,"click",0,2],
+["Lucky Peel","10% chance of a 5x click",4000,"crit",0,5],
+["Team Spirit","All income +25%",8000,"all",0,1.25],
+["Organic Farming","Banana Farms 2x",10000,"item",4,2],
+["Blender Upgrade","Smoothie Bars 2x",25000,"item",5,2],
+["Banana Gods","3x click power",50000,"click",0,3],
+["Mega Boost","All income 2x",100000,"all",0,2],
+["Warp Drive","Banana Ships 2x",500000,"item",8,2]
+]; // name, description, cost, type, target item, multiplier
+// 800 generated upgrades: 50 tiers per item (x1.25, unlock by owning 5 x tier), 100 click tiers (x1.15), 100 income tiers (x1.10)
+function genTiers(i){var it=ITEMS[i],prev=-1;for(var t=1;t<=50;t++){UPS.push([it[0]+" Lv "+t,it[0]+" +25%",Math.round(it[1]*8*Math.pow(1.3,t)),"item",i,1.25,prev,5*t]);prev=UPS.length-1}}
+for(var gi=0;gi<12;gi++)genTiers(gi);
+(function(){var prev=-1,t;
+ for(t=1;t<=100;t++){UPS.push(["Finger Training "+t,"Click power +15%",Math.round(200*Math.pow(1.2,t)),"click",0,1.15,prev,0]);prev=UPS.length-1}
+ prev=-1;
+ for(t=1;t<=100;t++){UPS.push(["Banana Boom "+t,"All income +10%",Math.round(20000*Math.pow(1.3,t)),"all",0,1.1,prev,0]);prev=UPS.length-1}
+})();
+for(var gj=12;gj<ITEMS.length;gj++)genTiers(gj); // upgrades for the 20 newer items
+var ups=UPS.map(function(){return false});
+var M={};
+function recalc(){M={click:1,all:1,crit:1,item:ITEMS.map(function(){return 1})};
+ UPS.forEach(function(u,k){if(!ups[k])return;if(u[3]==="item")M.item[u[4]]*=u[5];else M[u[3]]*=u[5]})}
+function mult(type,idx){return type==="item"?M.item[idx]:M[type]}
+recalc();
+var GROWTH=1.008, KEY="bananaClickerSave";
+var score=0, owned=ITEMS.map(function(){return 0}), lastSaved=Date.now();
+
+var NAMES=["million","billion","trillion","quadrillion","quintillion","sextillion","septillion","octillion","nonillion","decillion"];
+function fmt(n){
+  if(n<1e6)return Math.floor(n).toLocaleString("en-US");
+  var e=Math.floor(Math.log(n)/Math.LN10/3);
+  if(e-2>=NAMES.length)return n.toExponential(2).replace("e+"," x 10^");
+  var v=Math.floor(n/Math.pow(10,3*e)*100)/100;
+  return v+" "+NAMES[e-2];
+}
+function cost(i){return Math.ceil(ITEMS[i][1]*Math.pow(GROWTH,owned[i]))}
+function perClick(){var c=1;ITEMS.forEach(function(it,i){c+=it[3]*owned[i]*mult("item",i)});return c*mult("click")}
+function cps(){var c=0;ITEMS.forEach(function(it,i){c+=it[2]*owned[i]*mult("item",i)});return c*mult("all")}
+
+// ---------- save / load ----------
+function save(){
+  try{localStorage.setItem(KEY,JSON.stringify({score:score,owned:owned,upv:2,up:ups.map(function(v,k){return v?k:-1}).filter(function(k){return k>=0}),t:Date.now()}))}catch(e){}
+}
+function load(){
+  try{
+    var d=JSON.parse(localStorage.getItem(KEY)||"null");
+    if(d){
+      score=d.score||0;
+      owned=ITEMS.map(function(_,i){return (d.owned&&d.owned[i])||0});
+      if(d.upv===2){ups=UPS.map(function(){return false});(d.up||[]).forEach(function(k){if(k<UPS.length)ups[k]=true})}
+      else{ups=UPS.map(function(_,i){return !!(d.up&&d.up[i])})}
+      recalc();
+      var secs=Math.min((Date.now()-(d.t||Date.now()))/1000,3600); // offline earnings, up to 1 hour
+      score+=Math.floor(cps()*secs);
+    }
+  }catch(e){}
+}
+load();
+
+// ---------- shop UI (one item at a time, like the Arcade version) ----------
+var sel=0, N=ITEMS.length;
+function buy(i){
+  var p=cost(i);
+  if(score>=p){score-=p;owned[i]++;render();save()}
+}
+function buyMax(i){var n=0;while(score>=cost(i)){score-=cost(i);owned[i]++;n++}if(n){render();save()}}
+function buyAllItems(){
+  var any=true;
+  while(any){any=false;for(var i=0;i<N;i++){var p=cost(i);if(score>=p){score-=p;owned[i]++;any=true}}}
+  render();save();
+}
+document.getElementById("buymax").onclick=function(){buyMax(sel)};
+document.getElementById("buyall").onclick=buyAllItems;
+function browse(d){sel=(sel+d+N)%N;render()}
+document.getElementById("prev").onclick=function(){browse(-1)};
+document.getElementById("next").onclick=function(){browse(1)};
+document.getElementById("buy").onclick=function(){buy(sel)};
+function render(){
+  document.getElementById("score").textContent=fmt(score);
+  document.getElementById("cps").textContent=fmt(cps())+" /s  |  +"+fmt(perClick())+" /click";
+  var it=ITEMS[sel],p=cost(sel);
+  document.getElementById("iname").textContent=it[0];
+  document.getElementById("iown").textContent="x"+owned[sel];
+  var bb=document.getElementById("buy");
+  bb.textContent="B: "+fmt(p);
+  bb.className=score>=p?"good":"bad";
+  document.getElementById("ieff").textContent=it[3]?("+"+fmt(it[3]*mult("item",sel)*mult("click"))+"/click"):("+"+fmt(it[2]*mult("item",sel))+"/s");
+  document.getElementById("icount").textContent=(sel+1)+"/"+N;
+  renderUps();
+}
+var upPanel=document.getElementById("ups"),upEls=[],MAXSHOW=30;
+var upOrder=UPS.map(function(_,k){return k}).sort(function(x,y){return UPS[x][2]-UPS[y][2]||x-y});
+upOrder.forEach(function(k){
+  var u=UPS[k],b=document.createElement("button");b.className="up";b.style.display="none";
+  b.innerHTML='<span><b>'+u[0]+'</b><small>'+u[1]+'</small></span><span class="cost">'+fmt(u[2])+'</span>';
+  b.onclick=function(){buyUp(k)};
+  document.getElementById("uplist").appendChild(b);upEls[k]=b;
+});
+function buyUp(k){
+  if(unlocked(k)&&score>=UPS[k][2]){score-=UPS[k][2];ups[k]=true;recalc();render();save()}
+}
+function buyAllUps(){
+  var again=true,n=0;
+  while(again){
+    again=false;
+    for(var i=0;i<upOrder.length;i++){
+      var k=upOrder[i];
+      if(unlocked(k)&&score>=UPS[k][2]){score-=UPS[k][2];ups[k]=true;recalc();n++;again=true;break}
+    }
+  }
+  render();save();
+}
+document.getElementById("upall").onclick=buyAllUps;
+function unlocked(k){var u=UPS[k];return !ups[k]&&(u[6]>=0?ups[u[6]]:true)&&(!u[7]||owned[u[4]]>=u[7])}
+function renderUps(){
+  var afford=0,shown=0,bought=0;
+  upOrder.forEach(function(k){
+    var b=upEls[k];
+    if(ups[k])bought++;
+    var show=unlocked(k),ok=show&&score>=UPS[k][2];
+    if(ok)afford++;
+    var vis=show&&shown<MAXSHOW;if(vis)shown++;
+    b.style.display=vis?"":"none";
+    b.classList.toggle("ok",ok);
+  });
+  document.getElementById("upempty").style.display=shown?"none":"block";
+  document.getElementById("uptitle").textContent="Upgrades "+bought+"/"+UPS.length;
+  document.getElementById("upbtn").textContent="Upgrades"+(afford?" ("+afford+")":"");
+}
+function toggleUps(){upPanel.classList.toggle("open")}
+document.getElementById("upbtn").onclick=toggleUps;
+document.getElementById("upx").onclick=toggleUps;
+
+// ---------- click effects ----------
+var stage=document.getElementById("stage");
+var squash=0,sv=0,jump=0,jv=0;
+function click(e){
+  var n=perClick(),crit=false;if(mult("crit")>1&&Math.random()<0.1){n*=mult("crit");crit=true}score+=n;
+  squash=0.55;sv=0;jv=-5;
+  var r=stage.getBoundingClientRect();
+  var pop=document.createElement("div");pop.className="pop";pop.textContent="+"+fmt(n)+(crit?"!":"");if(crit)pop.style.color="#fff609";
+  pop.style.left=(30+Math.random()*40)+"%";pop.style.top="15%";
+  stage.appendChild(pop);setTimeout(function(){pop.remove()},800);
+  for(var k=0;k<8;k++){
+    var bit=document.createElement("div");bit.className="bit";
+    bit.style.background=["#ff6b6b","#7bd96b","#6bb6ff","#fff609"][k%4];
+    bit.style.left="50%";bit.style.top="50%";stage.appendChild(bit);
+    var a=Math.random()*6.28,d=50+Math.random()*50;
+    bit.animate([{transform:"translate(0,0)",opacity:1},{transform:"translate("+Math.cos(a)*d+"px,"+Math.sin(a)*d+"px)",opacity:0}],{duration:500,easing:"ease-out"});
+    (function(b){setTimeout(function(){b.remove()},500)})(bit);
+  }
+  document.body.animate([{transform:"translate(4px,3px)"},{transform:"translate(-4px,-3px)"},{transform:"translate(0,0)"}],{duration:150});
+  render();
+}
+stage.addEventListener("pointerdown",click);
+function giveBananas(){
+  score+=1000000;render();save();
+  var pop=document.createElement("div");pop.className="pop";pop.textContent="+1M cheat!";
+  pop.style.left="35%";pop.style.top="30%";pop.style.color="#fff609";
+  stage.appendChild(pop);setTimeout(function(){pop.remove()},800);
+  return "+1,000,000 bananas!";
+}
+// console cheat: type  plz.banana  (or  plz("banana")  ) in the browser console
+window.plz=Object.defineProperty(function(w){return String(w).toLowerCase()==="banana"?giveBananas():"try plz('banana')"},"banana",{get:giveBananas});
+var typed="";
+document.addEventListener("keydown",function(e){
+  if(e.key&&e.key.length===1){
+    typed=(typed+e.key.toLowerCase()).slice(-6);
+    if(typed==="banana"){
+      typed="";giveBananas();
+    }
+  }
+  if(e.code==="Space"){e.preventDefault();if(!e.repeat)click()}
+  else if(e.code==="ArrowLeft"){e.preventDefault();browse(-1)}
+  else if(e.code==="ArrowRight"){e.preventDefault();browse(1)}
+  else if(e.code==="KeyM"){buyMax(sel)}
+  else if(e.code==="KeyV"){buyAllItems()}
+  else if(e.code==="KeyU"){toggleUps()}
+  else if(e.code==="Escape"){upPanel.classList.remove("open")}
+  else if(e.code==="KeyB"||e.code==="Enter"){e.preventDefault();if(!e.repeat)buy(sel)}
+});
+
+// ---------- animation loop: breathing + spring pop ----------
+var banana=document.getElementById("banana");
+function frame(t){
+  sv+=-0.18*squash;sv*=0.82;squash+=sv;
+  jv+=-0.18*jump;jv*=0.82;jump+=jv;
+  var br=Math.sin(t/1000*2);
+  var sx=(1+br*0.03)*(1+squash*0.7), sy=(1+br*0.06)*(1-squash);
+  banana.style.transform="translateY("+(jump*2)+"px) scale("+sx+","+sy+")";
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ---------- passive income + autosave ----------
+setInterval(function(){var c=cps();if(c>0){score+=c;render()}},1000);
+setInterval(save,5000);
+window.addEventListener("beforeunload",save);
+document.addEventListener("visibilitychange",function(){if(document.hidden)save()});
+document.getElementById("reset").onclick=function(){
+  if(confirm("Delete your save and start over?")){
+    try{localStorage.removeItem(KEY)}catch(e){}
+    score=0;owned=ITEMS.map(function(){return 0});ups=UPS.map(function(){return false});recalc();render();
+  }
+};
+render();
+</script>
+</body>
+</html>
